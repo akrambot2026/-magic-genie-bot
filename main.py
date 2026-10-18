@@ -7,229 +7,147 @@ from flask import Flask, request
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# =========================
-# إعدادات البوت
-# =========================
-
-VERIFY_TOKEN = os.environ.get(
-    "VERIFY_TOKEN",
-    "akram12345"
-)
-
+VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "12345")
 PAGE_ACCESS_TOKEN = os.environ.get("PAGE_ACCESS_TOKEN")
 
-GRAPH_API_URL = "https://graph.facebook.com/v23.0/me/messages"
+GRAPH_URL = "https://graph.facebook.com/v18.0/me/messages"
 
-# =========================
-# الشخصيات
-# =========================
-
+# الشخصيات التي يستطيع البوت تخمينها
 CHARACTERS = [
     {
         "name": "رياض محرز ⚽🇩🇿",
-        "traits": {
-            "real": True,
-            "male": True,
-            "arabic": True,
-            "footballer": True,
-            "famous": True
-        }
+        "traits": [True, True, True, True]
     },
     {
         "name": "كريستيانو رونالدو ⚽🇵🇹",
-        "traits": {
-            "real": True,
-            "male": True,
-            "arabic": False,
-            "footballer": True,
-            "famous": True
-        }
+        "traits": [True, True, False, True]
     },
     {
         "name": "ليونيل ميسي ⚽🇦🇷",
-        "traits": {
-            "real": True,
-            "male": True,
-            "arabic": False,
-            "footballer": True,
-            "famous": True
-        }
+        "traits": [True, True, False, True]
     },
     {
         "name": "أبو فلّة 🎥",
-        "traits": {
-            "real": True,
-            "male": True,
-            "arabic": True,
-            "footballer": False,
-            "famous": True
-        }
+        "traits": [True, True, True, False]
     },
     {
         "name": "سبونج بوب 🧽",
-        "traits": {
-            "real": False,
-            "male": True,
-            "arabic": False,
-            "footballer": False,
-            "famous": True
-        }
-    },
-    {
-        "name": "باتمان 🦇",
-        "traits": {
-            "real": False,
-            "male": True,
-            "arabic": False,
-            "footballer": False,
-            "famous": True
-        }
+        "traits": [False, True, False, False]
     },
     {
         "name": "باربي 👱‍♀️",
-        "traits": {
-            "real": False,
-            "male": False,
-            "arabic": False,
-            "footballer": False,
-            "famous": True
-        }
+        "traits": [False, False, False, False]
     },
     {
-        "name": "أمك ❤️",
-        "traits": {
-            "real": True,
-            "male": False,
-            "arabic": True,
-            "footballer": False,
-            "famous": False
-        }
+        "name": "باتمان 🦇",
+        "traits": [False, True, False, False]
     }
 ]
-
-# =========================
-# الأسئلة
-# =========================
 
 QUESTIONS = [
-    {
-        "id": "real",
-        "text": "هل الشخصية حقيقية؟ 🤔"
-    },
-    {
-        "id": "male",
-        "text": "هل الشخصية ذكر؟ 👤"
-    },
-    {
-        "id": "arabic",
-        "text": "هل الشخصية عربية؟ 🌍"
-    },
-    {
-        "id": "footballer",
-        "text": "هل الشخصية لاعب كرة قدم؟ ⚽"
-    },
-    {
-        "id": "famous",
-        "text": "هل الشخصية مشهورة؟ ⭐"
-    }
+    "هل الشخصية حقيقية؟ 🤔",
+    "هل الشخصية ذكر؟ 👤",
+    "هل الشخصية عربية؟ 🌍",
+    "هل الشخصية لاعب كرة قدم؟ ⚽"
 ]
 
-# تخزين الجلسات في ذاكرة البرنامج
-user_sessions = {}
+# جلسات اللاعبين
+sessions = {}
 
 
-# =========================
-# إرسال الرسائل
-# =========================
-
-def send_message(recipient_id, message):
+def send_message(user_id, message):
+    """إرسال رسالة مع تسجيل أخطاء Facebook."""
     if not PAGE_ACCESS_TOKEN:
-        app.logger.error("PAGE_ACCESS_TOKEN غير مضبوط")
+        app.logger.error("PAGE_ACCESS_TOKEN غير موجود في Environment")
         return False
-
-    payload = {
-        "recipient": {"id": recipient_id},
-        "messaging_type": "RESPONSE",
-        "message": message
-    }
 
     try:
         response = requests.post(
-            GRAPH_API_URL,
+            GRAPH_URL,
             params={"access_token": PAGE_ACCESS_TOKEN},
-            json=payload,
+            json={
+                "recipient": {"id": user_id},
+                "messaging_type": "RESPONSE",
+                "message": message
+            },
             timeout=15
         )
 
         if not response.ok:
             app.logger.error(
-                "Facebook API error: %s",
+                "Facebook API HTTP %s: %s",
+                response.status_code,
                 response.text
             )
             return False
 
-        app.logger.info("Message sent successfully")
+        app.logger.info("تم إرسال الرسالة إلى Messenger")
         return True
 
     except requests.RequestException:
-        app.logger.exception("Message sending failed")
+        app.logger.exception("تعذر الاتصال بـ Facebook")
         return False
 
 
-def send_text(recipient_id, text):
-    return send_message(
-        recipient_id,
-        {"text": text}
-    )
+def send_text(user_id, text):
+    return send_message(user_id, {"text": text})
 
 
-def send_question(recipient_id, question):
+def send_question(user_id, index):
     return send_message(
-        recipient_id,
+        user_id,
         {
-            "text": question,
+            "text": QUESTIONS[index],
             "quick_replies": [
                 {
                     "content_type": "text",
                     "title": "نعم ✅",
-                    "payload": "ANSWER_YES"
+                    "payload": "YES"
                 },
                 {
                     "content_type": "text",
                     "title": "لا ❌",
-                    "payload": "ANSWER_NO"
+                    "payload": "NO"
                 },
                 {
                     "content_type": "text",
                     "title": "لا أعلم 🤷",
-                    "payload": "ANSWER_SKIP"
+                    "payload": "SKIP"
                 }
             ]
         }
     )
 
 
-# =========================
-# تخمين الشخصية
-# =========================
+def start_game(user_id):
+    sessions[user_id] = {
+        "step": 0,
+        "answers": []
+    }
+
+    send_text(
+        user_id,
+        "🔥 أهلاً بك في المارد السحري!\n\n"
+        "فكّر في شخصية، وأجب عن الأسئلة لأحاول تخمينها.\n"
+        "لنبدأ! 🧞"
+    )
+
+    send_question(user_id, 0)
+
 
 def guess_character(answers):
     best_character = None
-    best_score = -999
+    best_score = -1
 
     for character in CHARACTERS:
         score = 0
 
-        for question_id, answer in answers.items():
+        for index, answer in enumerate(answers):
             if answer is None:
                 continue
 
-            expected = character["traits"].get(question_id)
-
-            if expected == answer:
-                score += 2
-            else:
-                score -= 2
+            if character["traits"][index] == answer:
+                score += 1
 
         if score > best_score:
             best_score = score
@@ -238,91 +156,44 @@ def guess_character(answers):
     return best_character
 
 
-# =========================
-# بدء اللعبة
-# =========================
-
-def start_game(sender_id):
-    user_sessions[sender_id] = {
-        "step": 0,
-        "answers": {}
-    }
-
-    send_text(
-        sender_id,
-        "🔥 أهلاً بك في المارد السحري 🔥\n\n"
-        "فكّر في شخصية مشهورة، وسأحاول تخمينها!\n"
-        "أجب عن الأسئلة باستخدام الأزرار 👇"
-    )
-
-    send_question(
-        sender_id,
-        QUESTIONS[0]["text"]
-    )
-
-
-# =========================
-# معالجة الإجابة
-# =========================
-
-def process_answer(sender_id, answer):
-    session = user_sessions.get(sender_id)
+def handle_answer(user_id, answer):
+    session = sessions.get(user_id)
 
     if session is None:
-        start_game(sender_id)
+        start_game(user_id)
         return
 
     step = session["step"]
 
     if step >= len(QUESTIONS):
-        start_game(sender_id)
+        start_game(user_id)
         return
 
-    question_id = QUESTIONS[step]["id"]
-
-    session["answers"][question_id] = answer
+    session["answers"].append(answer)
     session["step"] += 1
 
     next_step = session["step"]
 
     if next_step < len(QUESTIONS):
-        send_question(
-            sender_id,
-            QUESTIONS[next_step]["text"]
-        )
+        send_question(user_id, next_step)
         return
 
     result = guess_character(session["answers"])
 
-    if result is None:
-        send_text(
-            sender_id,
-            "لم أتمكن من تخمين الشخصية 😅"
-        )
-    else:
-        send_text(
-            sender_id,
-            "🔮 المارد السحري يتوقع...\n\n"
-            f"✨ شخصيتك هي: {result['name']} ✨\n\n"
-            "هل أصبت التخمين؟ 😎\n"
-            "أرسل «ابدأ» للعب مرة أخرى."
-        )
+    send_text(
+        user_id,
+        "🔮 انتهى المارد من التفكير!\n\n"
+        f"✨ أتوقع أن شخصيتك هي: {result['name']} ✨\n\n"
+        "للعب مجدداً، أرسل: ابدأ"
+    )
 
-    user_sessions.pop(sender_id, None)
+    sessions.pop(user_id, None)
 
-
-# =========================
-# الصفحة الرئيسية
-# =========================
 
 @app.route("/", methods=["GET"])
 def home():
-    return "🔥 Genie Bot is Running!", 200
+    return "Genie Bot is running!", 200
 
-
-# =========================
-# التحقق من Webhook
-# =========================
 
 @app.route("/webhook", methods=["GET"])
 def verify():
@@ -336,108 +207,82 @@ def verify():
     return "Verification failed", 403
 
 
-# =========================
-# استقبال رسائل Messenger
-# =========================
-
 @app.route("/webhook", methods=["POST"])
-def webhook_post():
+def webhook():
     data = request.get_json(silent=True)
 
-    if not data or data.get("object") != "page":
-        return "Not Found", 404
+    if not data:
+        return "EVENT_RECEIVED", 200
+
+    if data.get("object") != "page":
+        return "Not a page event", 404
 
     for entry in data.get("entry", []):
         for event in entry.get("messaging", []):
 
             # تجاهل أحداث التسليم والقراءة
-            if event.get("delivery") or event.get("read"):
+            if "delivery" in event or "read" in event:
                 continue
 
-            sender_id = event.get("sender", {}).get("id")
+            sender = event.get("sender", {}).get("id")
 
-            if not sender_id:
-                continue
-
-            # تجاهل الرسائل التي يرسلها صاحب الصفحة
-            if event.get("message", {}).get("is_echo"):
+            if not sender:
                 continue
 
             message = event.get("message", {})
 
+            # تجاهل رسائل الصفحة نفسها
+            if message.get("is_echo"):
+                continue
+
             if not message:
                 continue
 
-            # استخراج الإجابة من الزر أو النص
+            app.logger.info("وصل حدث رسالة من Messenger")
+
+            # قراءة ضغط الأزرار
             quick_reply = message.get("quick_reply", {})
             payload = quick_reply.get("payload", "")
 
-            text = (
-                message.get("text") or ""
-            ).strip().lower()
+            text = (message.get("text") or "").strip().lower()
 
-            if payload == "ANSWER_YES":
+            if payload == "YES":
                 answer = True
 
-            elif payload == "ANSWER_NO":
+            elif payload == "NO":
                 answer = False
 
-            elif payload == "ANSWER_SKIP":
+            elif payload == "SKIP":
                 answer = None
 
-            elif text in ["نعم", "اي", "أجل", "yes", "y"]:
+            elif text in ("نعم", "اي", "أجل", "yes", "y"):
                 answer = True
 
-            elif text in ["لا", "no", "n"]:
+            elif text in ("لا", "no", "n"):
                 answer = False
 
-            elif text in [
-                "لا أعلم",
-                "لا اعلم",
-                "ربما",
-                "تخطي",
-                "skip"
-            ]:
+            elif text in ("لا أعلم", "لا اعلم", "تخطي", "skip", "ربما"):
                 answer = None
 
-            else:
-                # بدء لعبة جديدة عند عدم وجود جلسة
-                if (
-                    sender_id not in user_sessions
-                    or text in [
-                        "ابدأ",
-                        "ابدا",
-                        "ابدأ اللعبة",
-                        "العب",
-                        "start",
-                        "restart"
-                    ]
-                ):
-                    start_game(sender_id)
-
-                else:
-                    send_text(
-                        sender_id,
-                        "👇 اختر إجابتك من الأزرار "
-                        "الموجودة تحت السؤال.\n\n"
-                        "نعم ✅ أو لا ❌ أو لا أعلم 🤷"
-                    )
-
+            elif text in ("ابدأ", "ابدا", "ابدأ اللعبة", "العب", "start", "restart", "مرحبا", "سلام"):
+                start_game(sender)
                 continue
 
-            process_answer(sender_id, answer)
+            else:
+                if sender not in sessions:
+                    start_game(sender)
+                else:
+                    send_text(
+                        sender,
+                        "من فضلك أجب باستخدام الأزرار: نعم أو لا أو لا أعلم."
+                    )
+                continue
+
+            handle_answer(sender, answer)
 
     return "EVENT_RECEIVED", 200
 
 
-# =========================
-# تشغيل السيرفر
-# =========================
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+    port = int(os.environ.get("PORT", "10000"))
+    app.run(host="0.0.0.0", port=port)
