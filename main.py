@@ -2,7 +2,6 @@ import os
 import requests
 from flask import Flask, request
 
-# 1. تعريف تطبيق الفلاسك أولاً وقبل كل شيء
 app = Flask(__name__)
 
 VERIFY_TOKEN = "akram12345"
