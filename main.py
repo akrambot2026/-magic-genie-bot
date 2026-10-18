@@ -1,9 +1,11 @@
 import os
+import requests
 from flask import Flask, request
 
 app = Flask(__name__)
 
 VERIFY_TOKEN = "akram12345"
+PAGE_ACCESS_TOKEN = os.environ.get("PAGE_ACCESS_TOKEN")
 
 @app.route("/", methods=["GET"])
 def home():
@@ -22,6 +24,18 @@ def verify_webhook():
             return "Verification failed", 403
     return "Hello world", 200
 
+def send_message(recipient_id, message_text):
+    if not PAGE_ACCESS_TOKEN:
+        print("Error: PAGE_ACCESS_TOKEN is not set.")
+        return
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {"text": message_text}
+    }
+    response = requests.post(url, json=payload)
+    print("Send response:", response.text)
+
 @app.route("/webhook", methods=["POST"])
 def handle_messages():
     body = request.get_json()
@@ -32,6 +46,11 @@ def handle_messages():
                 if messaging.get("message"):
                     text = messaging["message"].get("text")
                     print(f"Received message from {sender_id}: {text}")
+                    
+                    # الرد على المستخدم
+                    reply_text = f"أهلاً بك يا أكرام! تلقيت رسالتك: '{text}'. المارد السحري يستعد للبدء معك الآن! 🧞‍♂️"
+                    send_message(sender_id, reply_text)
+                    
         return "EVENT_RECEIVED", 200
     return "Not Found", 404
 
