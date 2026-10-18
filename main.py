@@ -7,39 +7,38 @@ app = Flask(__name__)
 VERIFY_TOKEN = "akram12345"
 PAGE_ACCESS_TOKEN = os.environ.get("PAGE_ACCESS_TOKEN")
 
-# صورة المارد السحري الرئيسية (رابط مباشر موثوق)
-GENIE_IMAGE = "https://i.ibb.co/L8vT9J3/akinator.png"
+# صورة المارد السحري من ويكيبيديا (مباشرة ومضمونة)
+GENIE_IMAGE = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Akinator.png/600px-Akinator.png"
 
-# قاعدة بيانات الشخصيات مع روابط صور مباشرة وحقيقية
+# قاعدة بيانات الشخصيات مع روابط صور رسمية من ويكيبيديا
 CHARACTERS = [
     {
         "name": "رياض محرز ⚽🇩🇿",
-        "image": "https://i.ibb.co/3kXf58q/mahrez.jpg",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Riyad_Mahrez_2018.jpg/440px-Riyad_Mahrez_2018.jpg",
         "traits": {"real": True, "male": True, "arabic": True, "footballer": True, "youtuber": False}
     },
     {
         "name": "كريستيانو رونالدو ⚽🇵🇹",
-        "image": "https://i.ibb.co/BszMvQq/ronaldo.jpg",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Cristiano_Ronaldo_playing_for_Al_Nassr_FC_against_Persepolis_FC.jpg/400px-Cristiano_Ronaldo_playing_for_Al_Nassr_FC_against_Persepolis_FC.jpg",
         "traits": {"real": True, "male": True, "arabic": False, "footballer": True, "youtuber": False}
     },
     {
         "name": "أبو فلّة (AboFlah) 🎥",
-        "image": "https://i.ibb.co/mSRwzbd/aboflah.jpg",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Abu_Flah.jpg/400px-Abu_Flah.jpg",
         "traits": {"real": True, "male": True, "arabic": True, "footballer": False, "youtuber": True}
     },
     {
         "name": "سبونج بوب 🧽🟨",
-        "image": "https://i.ibb.co/S3J0Yw2/spongebob.png",
+        "image": "https://upload.wikimedia.org/wikipedia/en/thumb/3/3b/SpongeBob_SquarePants_character.svg/400px-SpongeBob_SquarePants_character.svg.png",
         "traits": {"real": False, "male": True, "arabic": False, "footballer": False, "youtuber": False}
     },
     {
         "name": "ليونيل ميسي ⚽🇦🇷",
-        "image": "https://i.ibb.co/YPXK6jH/messi.jpg",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-World-Cup_e1.jpg/400px-Lionel-Messi-Argentina-2022-World-Cup_e1.jpg",
         "traits": {"real": True, "male": True, "arabic": False, "footballer": True, "youtuber": False}
     }
 ]
 
-# قائمة الأسئلة
 QUESTIONS = [
     {"id": "real", "text": "هل الشخصية حقيقية؟ (ليست كرتونية)"},
     {"id": "male", "text": "هل الشخصية ذكر؟"},
@@ -68,7 +67,6 @@ def verify_webhook():
     return "Hello world", 200
 
 def send_image(recipient_id, image_url):
-    """إرسال صور موثوقة إلى فيسبوك"""
     if not PAGE_ACCESS_TOKEN:
         return
     url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
@@ -81,11 +79,9 @@ def send_image(recipient_id, image_url):
             }
         }
     }
-    res = requests.post(url, json=payload)
-    print("Image Sent Result:", res.text)
+    requests.post(url, json=payload)
 
 def send_question_with_buttons(recipient_id, question_text):
-    """إرسال 6 أزرار تفاعلية شبيها بـ Akinator الأصلي"""
     if not PAGE_ACCESS_TOKEN:
         return
     url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
@@ -115,14 +111,12 @@ def send_text(recipient_id, text):
     requests.post(url, json=payload)
 
 def smart_guess(answers):
-    """محرك التخمين الذكي بأسلوب حساب النقاط والمطابقة الدقيقة"""
-    best_char = None
-    max_score = -999
-
+    """دالة تصفية دقيقة لمنع تخمين أي شخصية تنقض إجابة قاطعة"""
+    candidates = []
+    
     for char in CHARACTERS:
+        valid = True
         score = 0
-        possible = True
-        
         for trait_id, user_val in answers.items():
             if user_val is None:
                 continue
@@ -131,15 +125,19 @@ def smart_guess(answers):
                 if char_val == user_val:
                     score += 2
                 else:
-                    # تخصيم نقاط واستبعاد إذا كان التناقض صريحاً
-                    score -= 5
-                    possible = False
-        
-        if score > max_score:
-            max_score = score
-            best_char = char
+                    # إذا كانت الإجابة قاطعة ومخالفة لشخصية معينة يتم استبعادها فوراً
+                    valid = False
+                    break
+        if valid:
+            candidates.append((score, char))
             
-    return best_char if best_char else CHARACTERS[0]
+    if candidates:
+        # ترتيب المرشحين حسب الأكثر مطابقة
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        return candidates[0][1]
+    
+    # في حال عدم وجود مطابقة كاملة يتم تقديم خيار افتراضي محتمل
+    return CHARACTERS[0]
 
 @app.route("/webhook", methods=["POST"])
 def handle_messages():
@@ -152,14 +150,13 @@ def handle_messages():
                 if messaging.get("message"):
                     user_text = messaging["message"].get("text", "").strip()
                     
-                    # بدء اللعبة
                     if user_text.lower() in ["بدء", "ابدأ", "مرحبا", "سلام", "start"]:
                         user_sessions[sender_id] = {
                             "step": 0,
                             "answers": {}
                         }
                         send_image(sender_id, GENIE_IMAGE)
-                        send_text(sender_id, "أهلاً بك! أنا المارد السحري الذكي 🧞‍♂️🔮\nفكر في شخصية وسأقرأ أفكارك الآن!")
+                        send_text(sender_id, "أهلاً بك! أنا المارد السحري 🧞‍♂️🔮\nفكر في شخصية وسأقوم بتخمينها الآن!")
                         send_question_with_buttons(sender_id, f"السؤال 1: {QUESTIONS[0]['text']}")
                     
                     elif sender_id in user_sessions:
@@ -167,13 +164,12 @@ def handle_messages():
                         step = session["step"]
                         q_id = QUESTIONS[step]["id"]
                         
-                        # تحليل رد المستخدم وتحويله إلى قيمة منطقية
                         if "نعم" in user_text:
                             session["answers"][q_id] = True
                         elif "لا" in user_text and "أعلم" not in user_text:
                             session["answers"][q_id] = False
                         else:
-                            session["answers"][q_id] = None # لا أعلم أو محايد
+                            session["answers"][q_id] = None
                             
                         step += 1
                         session["step"] = step
@@ -181,14 +177,13 @@ def handle_messages():
                         if step < len(QUESTIONS):
                             send_question_with_buttons(sender_id, f"السؤال {step + 1}: {QUESTIONS[step]['text']}")
                         else:
-                            # حساب الشخصية وترشيح الصورة والنتيجة
                             result = smart_guess(session["answers"])
-                            send_text(sender_id, f"لقد حللت أفكارك بنجاح! 🔮🧠\n\nالشخصية التي تفكر فيها هي:\n✨ **{result['name']}** ✨")
+                            send_text(sender_id, f"لقد قمت بتحليل أفكارك بنجاح! 🔮🧠\n\nالشخصية هي:\n✨ **{result['name']}** ✨")
                             send_image(sender_id, result["image"])
                             send_text(sender_id, "أرسل 'ابدأ' لتحدي المارد من جديد! 🧞‍♂️")
                             del user_sessions[sender_id]
                     else:
-                        send_text(sender_id, "أهلاً بك! أرسل كلمة 'ابدأ' لبدء تحدي المارد السحري! 🧞‍♂️")
+                        send_text(sender_id, "أهلاً بك! أرسل كلمة 'ابدأ' لبدء اللعب مع المارد السحري! 🧞‍♂️")
                         
         return "EVENT_RECEIVED", 200
     return "Not Found", 404
