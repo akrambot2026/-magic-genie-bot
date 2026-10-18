@@ -7,7 +7,6 @@ app = Flask(__name__)
 VERIFY_TOKEN = "akram12345"
 PAGE_ACCESS_TOKEN = os.environ.get("PAGE_ACCESS_TOKEN")
 
-# قائمة الشخصيات
 CHARACTERS = [
     {"name": "رياض محرز ⚽🇩🇿", "traits": {"real": True, "male": True, "arabic": True, "footballer": True}},
     {"name": "كريستيانو رونالدو ⚽🇵🇹", "traits": {"real": True, "male": True, "arabic": False, "footballer": True}},
@@ -15,7 +14,6 @@ CHARACTERS = [
     {"name": "سبونج بوب 🧽🟨", "traits": {"real": False, "male": True, "arabic": False, "footballer": False}}
 ]
 
-# قائمة الأسئلة مع الإيموجي
 QUESTIONS = [
     {"id": "real", "text": "❓ السؤال 1: هل الشخصية حقيقية؟ (ليست كرتونية)"},
     {"id": "male", "text": "❓ السؤال 2: هل الشخصية ذكر؟"},
@@ -27,7 +25,7 @@ user_sessions = {}
 
 @app.route("/", methods=["GET"])
 def home():
-    return "Bot is Running!", 200
+    return "Bot is Running Successfully!", 200
 
 @app.route("/webhook", methods=["GET"])
 def verify():
@@ -97,7 +95,6 @@ def webhook_post():
                     msg = messaging["message"]
                     user_text = msg.get("text", "").strip()
 
-                    # التحقق من الضغط على الأزرار السريعة
                     if "quick_reply" in msg:
                         payload = msg["quick_reply"].get("payload")
                         if payload == "YES":
@@ -107,12 +104,38 @@ def webhook_post():
                         elif payload == "SKIP":
                             user_text = "لا أعلم"
 
-                    # بداية اللعبة
                     if "ابدأ" in user_text or "start" in user_text.lower():
                         user_sessions[sender_id] = {"step": 0, "answers": {}}
                         send_text(sender_id, "🧞‍♂️ أهلاً بك في لعبة المارد السحري!\nفكر في شخصية وسأقوم بتخمينها الآن عبر الأسئلة التالية 👇")
                         send_question_with_buttons(sender_id, QUESTIONS[0]["text"])
 
-                    # الإجابة على الأسئلة
                     elif sender_id in user_sessions:
-                        session = user_sessions
+                        session = user_sessions[sender_id]
+                        step = session["step"]
+                        q_id = QUESTIONS[step]["id"]
+
+                        if "نعم" in user_text:
+                            session["answers"][q_id] = True
+                        elif "لا" in user_text:
+                            session["answers"][q_id] = False
+                        else:
+                            session["answers"][q_id] = None
+
+                        step += 1
+                        session["step"] = step
+
+                        if step < len(QUESTIONS):
+                            send_question_with_buttons(sender_id, QUESTIONS[step]["text"])
+                        else:
+                            result = guess_character(session["answers"])
+                            send_text(sender_id, f"🔮 المارد السحري يقول:\n\nالشخصية التي تفكر فيها هي:\n✨ {result['name']} ✨\n\nأرسل كلمة 'ابدأ' للتحدي من جديد! 🧞‍♂️")
+                            del user_sessions[sender_id]
+                    else:
+                        send_text(sender_id, "🧞‍♂️ أهلاً بك! أرسل كلمة 'ابدأ' لبدء اللعبة.")
+
+        return "EVENT_RECEIVED", 200
+    return "Not Found", 404
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
