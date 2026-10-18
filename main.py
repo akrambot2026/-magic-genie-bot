@@ -7,35 +7,30 @@ app = Flask(__name__)
 VERIFY_TOKEN = "akram12345"
 PAGE_ACCESS_TOKEN = os.environ.get("PAGE_ACCESS_TOKEN")
 
-# صورة المارد السحري من ويكيبيديا (مباشرة ومضمونة)
-GENIE_IMAGE = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Akinator.png/600px-Akinator.png"
+# روابط صور فائقة السرعة ومفتوحة تماماً لفيسبوك
+GENIE_IMAGE = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop"
 
-# قاعدة بيانات الشخصيات مع روابط صور رسمية من ويكيبيديا
+# قاعدة بيانات الشخصيات مع روابط صور حقيقية ومباشرة
 CHARACTERS = [
     {
         "name": "رياض محرز ⚽🇩🇿",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Riyad_Mahrez_2018.jpg/440px-Riyad_Mahrez_2018.jpg",
+        "image": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=500&auto=format&fit=crop", # صورة رمزية لكرة القدم
         "traits": {"real": True, "male": True, "arabic": True, "footballer": True, "youtuber": False}
     },
     {
         "name": "كريستيانو رونالدو ⚽🇵🇹",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Cristiano_Ronaldo_playing_for_Al_Nassr_FC_against_Persepolis_FC.jpg/400px-Cristiano_Ronaldo_playing_for_Al_Nassr_FC_against_Persepolis_FC.jpg",
+        "image": "https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=500&auto=format&fit=crop",
         "traits": {"real": True, "male": True, "arabic": False, "footballer": True, "youtuber": False}
     },
     {
         "name": "أبو فلّة (AboFlah) 🎥",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Abu_Flah.jpg/400px-Abu_Flah.jpg",
+        "image": "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500&auto=format&fit=crop", # صورة تعبر عن صناعة المحتوى واليوتيوب
         "traits": {"real": True, "male": True, "arabic": True, "footballer": False, "youtuber": True}
     },
     {
         "name": "سبونج بوب 🧽🟨",
-        "image": "https://upload.wikimedia.org/wikipedia/en/thumb/3/3b/SpongeBob_SquarePants_character.svg/400px-SpongeBob_SquarePants_character.svg.png",
+        "image": "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&auto=format&fit=crop", # صورة كرتونية
         "traits": {"real": False, "male": True, "arabic": False, "footballer": False, "youtuber": False}
-    },
-    {
-        "name": "ليونيل ميسي ⚽🇦🇷",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-World-Cup_e1.jpg/400px-Lionel-Messi-Argentina-2022-World-Cup_e1.jpg",
-        "traits": {"real": True, "male": True, "arabic": False, "footballer": True, "youtuber": False}
     }
 ]
 
@@ -51,7 +46,7 @@ user_sessions = {}
 
 @app.route("/", methods=["GET"])
 def home():
-    return "Akinator Bot is running successfully!", 200
+    return "Akinator Bot Status: Online & Ready!", 200
 
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
@@ -67,19 +62,27 @@ def verify_webhook():
     return "Hello world", 200
 
 def send_image(recipient_id, image_url):
+    """دالة إرسال الصور عبر الـ Graph API المعتمدة من فيسبوك"""
     if not PAGE_ACCESS_TOKEN:
+        print("Error: PAGE_ACCESS_TOKEN is missing!")
         return
+    
     url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
     payload = {
         "recipient": {"id": recipient_id},
         "message": {
             "attachment": {
                 "type": "image",
-                "payload": {"url": image_url, "is_reusable": True}
+                "payload": {
+                    "url": image_url,
+                    "is_reusable": True
+                }
             }
         }
     }
-    requests.post(url, json=payload)
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, json=payload, headers=headers)
+    print("Send Image Response:", response.status_code, response.text)
 
 def send_question_with_buttons(recipient_id, question_text):
     if not PAGE_ACCESS_TOKEN:
@@ -91,14 +94,13 @@ def send_question_with_buttons(recipient_id, question_text):
             "text": question_text,
             "quick_replies": [
                 {"content_type": "text", "title": "نعم ✅", "payload": "YES"},
-                {"content_type": "text", "title": "غالباً نعم 👍", "payload": "MOSTLY_YES"},
-                {"content_type": "text", "title": "لا أعلم 🤷‍♂️", "payload": "DONT_KNOW"},
-                {"content_type": "text", "title": "غالباً لا 👎", "payload": "MOSTLY_NO"},
-                {"content_type": "text", "title": "لا ❌", "payload": "NO"}
+                {"content_type": "text", "title": "لا ❌", "payload": "NO"},
+                {"content_type": "text", "title": "لا أعلم 🤷‍♂️", "payload": "DONT_KNOW"}
             ]
         }
     }
-    requests.post(url, json=payload)
+    headers = {"Content-Type": "application/json"}
+    requests.post(url, json=payload, headers=headers)
 
 def send_text(recipient_id, text):
     if not PAGE_ACCESS_TOKEN:
@@ -108,36 +110,35 @@ def send_text(recipient_id, text):
         "recipient": {"id": recipient_id},
         "message": {"text": text}
     }
-    requests.post(url, json=payload)
+    headers = {"Content-Type": "application/json"}
+    requests.post(url, json=payload, headers=headers)
 
 def smart_guess(answers):
-    """دالة تصفية دقيقة لمنع تخمين أي شخصية تنقض إجابة قاطعة"""
-    candidates = []
-    
+    """محرك التخمين المطابق للإجابات بذكاء"""
+    best_match = CHARACTERS[0]
+    highest_score = -10
+
     for char in CHARACTERS:
-        valid = True
         score = 0
-        for trait_id, user_val in answers.items():
-            if user_val is None:
+        is_possible = True
+        
+        for q_id, user_ans in answers.items():
+            if user_ans is None:
                 continue
-            char_val = char["traits"].get(trait_id)
-            if char_val is not None:
-                if char_val == user_val:
-                    score += 2
-                else:
-                    # إذا كانت الإجابة قاطعة ومخالفة لشخصية معينة يتم استبعادها فوراً
-                    valid = False
-                    break
-        if valid:
-            candidates.append((score, char))
             
-    if candidates:
-        # ترتيب المرشحين حسب الأكثر مطابقة
-        candidates.sort(key=lambda x: x[0], reverse=True)
-        return candidates[0][1]
-    
-    # في حال عدم وجود مطابقة كاملة يتم تقديم خيار افتراضي محتمل
-    return CHARACTERS[0]
+            char_trait = char["traits"].get(q_id)
+            if char_trait is not None:
+                if char_trait == user_ans:
+                    score += 3
+                else:
+                    score -= 5
+                    is_possible = False
+        
+        if is_possible and score > highest_score:
+            highest_score = score
+            best_match = char
+
+    return best_match
 
 @app.route("/webhook", methods=["POST"])
 def handle_messages():
