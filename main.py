@@ -130,15 +130,19 @@ def smart_guess(answers):
 @app.route("/webhook", methods=["POST"])
 def handle_messages():
     body = request.get_json()
+    print("--- RECEIVED WEBHOOK BODY ---", body)
+    
     if body and body.get("object") == "page":
         for entry in body.get("entry", []):
             for messaging in entry.get("messaging", []):
                 sender_id = messaging.get("sender", {}).get("id")
+                print("Sender ID:", sender_id)
                 
                 if messaging.get("message"):
                     user_text = messaging["message"].get("text", "").strip()
+                    print("User Text:", user_text)
                     
-                    if "بدء" in user_text.lower() or "start" in user_text.lower():
+                    if "ابدأ" in user_text.lower() or "start" in user_text.lower():
                         user_sessions[sender_id] = {
                             "step": 0,
                             "answers": {}
