@@ -47,7 +47,6 @@ def handle_messages():
                     text = messaging["message"].get("text")
                     print(f"Received message from {sender_id}: {text}")
                     
-                    # الرد على المستخدم
                     reply_text = f"أهلاً بك يا أكرام! تلقيت رسالتك: '{text}'. المارد السحري يستعد للبدء معك الآن! 🧞‍♂️"
                     send_message(sender_id, reply_text)
                     
