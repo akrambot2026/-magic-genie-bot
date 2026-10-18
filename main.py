@@ -95,6 +95,7 @@ def webhook_post():
                     msg = messaging["message"]
                     user_text = msg.get("text", "").strip()
 
+                    # التعامل مع الأزرار
                     if "quick_reply" in msg:
                         payload = msg["quick_reply"].get("payload")
                         if payload == "YES":
@@ -104,19 +105,15 @@ def webhook_post():
                         elif payload == "SKIP":
                             user_text = "لا أعلم"
 
-                    if "ابدأ" in user_text or "start" in user_text.lower():
-                        user_sessions[sender_id] = {"step": 0, "answers": {}}
-                        send_text(sender_id, "🧞‍♂️ أهلاً بك في لعبة المارد السحري!\nفكر في شخصية وسأقوم بتخمينها الآن عبر الأسئلة التالية 👇")
-                        send_question_with_buttons(sender_id, QUESTIONS[0]["text"])
-
-                    elif sender_id in user_sessions:
+                    # إذا كان المستخدم في منتصف الجلسة ويجيب على الأسئلة
+                    if sender_id in user_sessions and user_text in ["نعم", "لا", "لا أعلم"]:
                         session = user_sessions[sender_id]
                         step = session["step"]
                         q_id = QUESTIONS[step]["id"]
 
-                        if "نعم" in user_text:
+                        if user_text == "نعم":
                             session["answers"][q_id] = True
-                        elif "لا" in user_text:
+                        elif user_text == "لا":
                             session["answers"][q_id] = False
                         else:
                             session["answers"][q_id] = None
@@ -128,10 +125,13 @@ def webhook_post():
                             send_question_with_buttons(sender_id, QUESTIONS[step]["text"])
                         else:
                             result = guess_character(session["answers"])
-                            send_text(sender_id, f"🔮 المارد السحري يقول:\n\nالشخصية التي تفكر فيها هي:\n✨ {result['name']} ✨\n\nأرسل كلمة 'ابدأ' للتحدي من جديد! 🧞‍♂️")
+                            send_text(sender_id, f"🔮 المارد السحري يقول:\n\nالشخصية التي تفكر فيها هي:\n✨ {result['name']} ✨\n\nأرسل أي رسالة للعب مرة أخرى! 🧞‍♂️")
                             del user_sessions[sender_id]
                     else:
-                        send_text(sender_id, "🧞‍♂️ أهلاً بك! أرسل كلمة 'ابدأ' لبدء اللعبة.")
+                        # لبدء اللعبة تلقائياً مع أي كلمة يرسلها المستخدم
+                        user_sessions[sender_id] = {"step": 0, "answers": {}}
+                        send_text(sender_id, "🧞‍♂️ أهلاً بك في لعبة المارد السحري!\nفكر في شخصية وسأقوم بتخمينها الآن عبر الأسئلة التالية 👇")
+                        send_question_with_buttons(sender_id, QUESTIONS[0]["text"])
 
         return "EVENT_RECEIVED", 200
     return "Not Found", 404
